@@ -44,65 +44,81 @@ The likely affected components are the `tls` command, the `vmmap` command, and t
 
 ### Environment Setup
 
-[Notes on setting up your local development environment - challenges you faced, how you solved them]
+### Environment Setup
+
+I forked the `pwndbg/pwndbg` repository and created a working branch for this issue. Since this issue depends on Linux memory mapping behavior, I plan to use a Linux-based development environment such as Codespaces, WSL, or a Linux VM rather than macOS directly.
 
 ### Steps to Reproduce
 
-1. [Step 1]
-2. [Step 2]
-3. [Observed result]
+1. Set up pwndbg in a Linux-based environment.
+2. Start a simple binary with GDB and pwndbg enabled, such as `/bin/ls`.
+3. Run `start` to initialize the process.
+4. Run `tls` to get the Thread Local Storage base address.
+5. Run `vmmap` and locate the memory mapping that contains the TLS base address.
+6. Observe that the TLS base address is not annotated in the `vmmap` output.
 
 ### Reproduction Evidence
 
-- **Commit showing reproduction:** [Link to commit in your fork]
-- **Screenshots/logs:** [If applicable]
-- **My findings:** [What you discovered during reproduction]
-
+- **Commit showing reproduction:** TBD
+- **Screenshots/logs:** TBD
+- **My findings:** Based on the issue discussion, `tls` can identify the TLS base address, but `vmmap` only shows the surrounding anonymous mapping. The maintainer clarified that the entire mapping should not be relabeled as TLS because the TLS base is not page-aligned.
 ---
 
 ## Solution Approach
 
 ### Analysis
 
-[Your analysis of the root cause - what's causing the issue?]
+The issue is not simply that the anonymous mapping should be renamed to `[tls]`. Based on maintainer feedback, the TLS base address may be located inside a larger page rather than at the beginning of the mapping. In the example, the mapping starts at `0x...3000`, while the TLS base is `0x...3800`, which means at least `0x800` bytes before the TLS base are not TLS. Therefore, labeling the entire page as TLS would be misleading.
 
 ### Proposed Solution
 
-[High-level description of your fix approach]
+The better approach is to annotate the exact TLS base address in the `vmmap` output, similar to how the `vis` command displays address annotations. I will investigate how `vmmap` formats memory mappings and how `vis` adds markers such as `<--- ...`, then adapt that pattern so `vmmap` can show something like `<--- TLS` at the TLS base address.
 
 ### Implementation Plan
 
-Using UMPIRE framework (adapted):
+Using UMPIRE framework:
 
-**Understand:** [Restate the problem]
+**Understand:**  
+The `tls` command can find the TLS base address, but `vmmap` does not display that address in a recognizable way.
 
-**Match:** [What similar patterns/solutions exist in the codebase?]
+**Match:**  
+I will compare the `tls`, `vmmap`, and `vis` implementations to find existing patterns for retrieving addresses and annotating output.
 
-**Plan:** [Step-by-step implementation plan]
-1. [Modify file X to do Y]
-2. [Add function Z]
-3. [Update tests]
+**Plan:**
+1. Read the `tls` command implementation to understand how TLS base addresses are retrieved.
+2. Read the `vmmap` command implementation to understand how memory mappings are displayed.
+3. Read the `vis` command implementation to understand how address annotations are rendered.
+4. Reproduce the current behavior locally.
+5. Implement a small change that annotates the TLS base address without relabeling the whole mapping.
+6. Verify that the approach works across architectures if possible.
+7. Document any SELinux-related setup caveat mentioned by the maintainer.
+8. Add or update tests if the project has existing tests for `vmmap` output.
 
-**Implement:** [Link to your branch/commits as you work]
+**Review:**  
+I will check that the change follows pwndbg’s existing output style and does not imply that an entire page is TLS when only part of the mapping may be related to TLS.
 
-**Review:** [Self-review checklist - does it follow the project's contribution guidelines?]
-
-**Evaluate:** [How will you verify it works?]
+**Evaluate:**  
+I will compare the output of `tls` and `vmmap` before and after the change, and run relevant pwndbg tests if possible.
 
 ---
 
 ## Testing Strategy
 
+### Manual Testing
+
+- [ ] Run `tls` and record the TLS base address.
+- [ ] Run `vmmap` and confirm that the TLS base address is annotated.
+- [ ] Confirm that the surrounding mapping is not incorrectly renamed entirely as TLS.
+- [ ] Compare the output style with the existing `vis` annotation format.
+
 ### Unit Tests
 
-- [ ] Test case 1: [Description]
-- [ ] Test case 2: [Description]
-- [ ] Test case 3: [Description]
+- [ ] Search for existing tests around `vmmap` output.
+- [ ] Add or update a test if there is an existing pattern for command output testing.
 
 ### Integration Tests
 
-- [ ] Integration scenario 1
-- [ ] Integration scenario 2
+- [ ] Run the relevant pwndbg test suite if the local environment supports it.
 
 ### Manual Testing
 
