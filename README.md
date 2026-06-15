@@ -28,7 +28,7 @@ The `tls` command in pwndbg can already find and print the Thread Local Storage 
 
 ### Expected Behavior
 
-When `vmmap` displays the memory map, the mapping that contains the TLS base address should be labeled or annotated so users can easily recognize the TLS region.
+When `vmmap` displays the memory map, it should annotate the exact TLS base address inside the relevant mapping, rather than relabeling the entire mapping as TLS. This avoids implying that the whole page is TLS when the TLS base is not page-aligned and the page may contain non-TLS padding or other data.
 
 ### Current Behavior
 
